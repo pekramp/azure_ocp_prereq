@@ -1,6 +1,6 @@
 ---
 #### Make sure to run as 'ansible-playbook -u root -k' for first run
-- name: Change hostfile template
+- name: Basic configuration of a test system
   hosts: rhel8
   become: yes
   tasks:
