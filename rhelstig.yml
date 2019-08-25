@@ -1,0 +1,9 @@
+---
+- name: Primary Testing Playbook
+  hosts: target 
+  become: true
+  roles:
+    - RHEL7-STIG  
+  
+
+        

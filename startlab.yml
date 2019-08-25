@@ -1,0 +1,13 @@
+---
+- name: Start Local Lab
+  hosts: localhost 
+  become: true
+  tasks:
+    - name: Start git server
+      shell: "virsh start git"
+    - name: Start Postgres
+      shell: "virsh start postgres" 
+    - name: Start Tower
+      shell: "virsh start tower"
+    - name: Start Target
+      shell: "virsh start target"

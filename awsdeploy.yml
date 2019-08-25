@@ -1,0 +1,203 @@
+#run via: ansible-playbook -e 'ansible_python_interpreter="/usr/bin/env python"' --ask-vault-pass awsdeploy.yml --key-file ~/keys/awskey.pem  
+#Before Running you will need to configure the below vars and post deploymetn vars (further down  as necessary
+#Ensure that a vaulted AWS Key file is generated that includes the following variables.
+# pg_password
+# admin_password
+# rabbitmq_password
+# aws_access_key
+# aws_secret_key
+#Additionally you will need to have your ec2-user SSH certificate passed as "awskey.pem"
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    instance_type: t2.medium     
+    security_group: 
+      - "Anywhere-SSH"
+      - "default"
+      - "Web Access"  
+    dbsecurity_group:
+      - "Anywhere-SSH"
+      - "default"
+    image: "ami-0d70a070"
+    keypair: "Amazon AWS Key"
+    region: us-east-1
+    count: 3
+    inventorypath: "/home/cgrimm/ansible-tower-setup-3.5.0-1/inventory"
+    setuppath: "./home/cgrimm/ansible-tower-setup-3.5.0.1/setup.sh"
+    pg_port: 5432
+  vars_files:
+    - awskeys.yml
+
+  tasks:
+    - name: Provision Tower Node EC2 Instances
+      ec2:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        group: "{{ security_group }}"
+        instance_type: "{{ instance_type }}"
+        image: "{{ image }}"  
+        wait: true
+        region: "{{ region }}"
+        keypair: "{{ keypair }}"
+        count: "{{ count }}"
+      register: ec2
+
+    - name: Tagging Ansible Tower Nodes
+      ec2_tag:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        resource: "{{ item.id }}" 
+        region: "{{ region }}" 
+        state: "present"
+      with_items: "{{ ec2.instances }}"
+      args:
+        tags:
+          Type: ansible_tower    
+
+    - name: Adding Ansible Tower Nodes to Tower Inventory file
+      lineinfile:
+        path: "{{ inventorypath }}"
+        insertafter: '^\[tower\]'
+        line: "{{ item.public_dns_name }}"
+        state: present
+      with_items: "{{ ec2.instances }}"
+    
+    - name: Provision Tower Database EC2 Instance
+      ec2:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        group: "{{ dbsecurity_group }}"
+        instance_type: "{{ instance_type }}"
+        image: "{{ image }}"
+        wait: true
+        region: "{{ region }}"
+        keypair: "{{ keypair }}"
+        count: 1  
+      register: ec2db
+
+    - name: Tagging Ansible Tower DB Instance
+      ec2_tag:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        resource: "{{ item.id }}"
+        region: "{{ region }}"
+        state: "present"
+      with_items: "{{ ec2db.instances }}"
+      args:
+        tags:
+          Type: ansible_database
+
+    - name: Adding Ansible Tower DB to Tower Inventory File
+      lineinfile:
+        path: "{{ inventorypath }}"
+        insertafter: '^\[database\]'
+        line: "{{ item.public_dns_name }}"
+        state: present
+      with_items: "{{ ec2db.instances }}"
+    
+    - name: Configuring Additional Tower DB information in Inventory File
+      replace:
+        path: "{{ inventorypath }}"
+        regexp: "^pg_host=''"
+        replace: "pg_host='{{ item.public_dns_name }}'"
+      with_items: "{{ ec2db.instances }}"
+
+    - name: Configuring Additional Ansible Tower DB password
+      replace:
+        path: "{{ inventorypath }}"
+        regexp: "^pg_password=''"
+        replace: "pg_password='{{ pg_password }}'"
+
+    - name: Configuring Additional Ansible Tower DB Port
+      replace:
+        path: "{{ inventorypath }}"
+        regexp: "^pg_port=''"
+        replace: "pg_port='{{ pg_port }}'"
+        
+    - name: Configuring Rabbitmq password
+      replace:
+        path: "{{ inventorypath }}"
+        regexp: "^rabbitmq_password=''"
+        replace: "rabbitmq_password='{{ rabbitmq_password }}'"
+
+    - name: Configuring Rabbitmq password
+      replace:
+        path: "{{ inventorypath }}"
+        regexp: "^admin_password=''"
+        replace: "admin_password='{{ admin_password }}'"
+
+    - name: Configured additional inventory file requirements - http_port
+      lineinfile:
+        path: "{{ inventorypath }}"
+        line: 'http_port=80'
+        state: present
+
+    - name: Configured additional inventory file requirements - https_port
+      lineinfile:
+        path: "{{ inventorypath }}"
+        line: 'https_port=443'
+        state: present
+
+    - name: Configure Inventory file to allow for privilege escalation for remote install
+      lineinfile:
+        path: "{{ inventorypath }}"
+        line: 'ansible_become=true'
+        state: present
+
+    - name: Add EC2 Instances to temp host file
+      add_host:
+        name: "{{ item.public_ip }}"
+        groups: ansible
+      with_items: 
+        - "{{ ec2.instances }}"
+        - "{{ ec2db.instances }}"  
+      
+    - name: Wait for SSH to become available
+      wait_for:
+        host: "{{ item.public_ip }}"
+        port: 22 
+        state: started 
+      with_items: 
+        - "{{ ec2.instances }}"
+        - "{{ ec2db.instances }}"
+
+- hosts: ansible
+  name: Post Deployment System Preparation
+  vars:
+    userid: cgrimm
+    userpubkeylocation: /home/cgrimm/.ssh/id_rsa.pub
+  remote_user: ec2-user
+  become: yes
+  tasks:
+    - name: Creating User on Instances
+      user:
+        name: "{{ userid }}"
+        state: present
+        createhome: yes
+        group: wheel
+        append: yes
+
+    - name: Adding User to wheel for Sudoers Access
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+    - name: Add authorized key for "{{ userid }}"
+      authorized_key: 
+        user: "{{ userid }}"
+        state: present
+        key: "{{ item }}"
+      with_file:
+        - "{{ userpubkeylocation }}"
+
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    setuppath: "/home/cgrimm/ansible-tower-setup-3.5.0-1/setup.sh"
+  tasks:
+    - name: Installing Tower (this could take a while)
+      command: sh /home/cgrimm/ansible-tower-setup-3.5.0-1/setup.sh  
