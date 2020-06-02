@@ -1,7 +1,0 @@
----
-- name: shutdown lab
-  hosts: lab
-  become: true
-  tasks:
-    - name: Shutdown Command
-      shell: shutdown -t now
