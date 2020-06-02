@@ -2,6 +2,8 @@
 - name: Register system with Subscription Manager
   hosts: all
   become: true
+  vars_files:
+    - subvars.yml
   tasks:
     - name: Register with RHN Account
       shell: subscription-manager register --force --username "{{ rhnusername }}"  --password "{{ rhnpassword }}" --auto-attach
