@@ -1,6 +1,6 @@
 ---
 - name: Register system with Subscription Manager
-  hosts: all
+  hosts: pihole
   become: true
   vars_files:
     - subvars.yml
