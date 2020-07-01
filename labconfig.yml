@@ -32,17 +32,17 @@
       with_file:
         - ~/.ssh/id_rsa.pub
 
-    - name: Change the hostname to align with ansible hostname
-      hostname:
-        name= "{{ inventory_hostname }}"
-      when:
-        ansible_fqdn != ansible_ssh_host
-
     - name: Ensure updates are applied
       package:
         name: "*"
         state: latest
 
+    - name: Change the hostname to align with ansible hostname
+      hostname:
+        name= "{{ inventory_hostname }}"
+      when:
+        ansible_fqdn != ansible_ssh_host       
+ 
     - name: Fix /etc/hosts removing the old hostname
       tags:
         - hosts
