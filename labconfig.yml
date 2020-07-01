@@ -3,6 +3,8 @@
 - name: Basic configuration of a test system
   hosts: lab
   become: yes
+  vars_files:
+    - subvars.yml
   roles:
     - dns
   tasks:
@@ -50,6 +52,20 @@
         line: "{{ ansible_default_ipv4.address }} {{ inventory_hostname }} {{ ansible_hostname }}"
         regexp: "^{{ ansible_default_ipv4.address }}"
       when:
-        ansible_fqdn != inventory_hostname
+        ansible_fqdn != ansible_ssh_host
 
-  
+    - name: Set /etc/hostname file
+      lineinfile:
+        state: present
+        dest: /etc/hostname
+        line: "{{ inventory_hostname }}"
+      when:
+        ansible_fqdn != ansible_ssh_host 
+
+    - name: Register with RHN Account
+      redhat_subscription:
+        state: present
+        username: "{{ rhnusername }}"
+        password: "{{ rhnpassword }}"
+        auto_attach: true
+       
