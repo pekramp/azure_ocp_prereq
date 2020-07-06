@@ -8,6 +8,13 @@
   roles:
     - dns
   tasks:
+    - name: Register with RHN Account
+      redhat_subscription:
+        state: present
+        username: "{{ rhnusername }}"
+        password: "{{ rhnpassword }}"
+        auto_attach: true
+    
     - name: Create cgrimm user
       user:
         name: cgrimm
@@ -62,10 +69,4 @@
       when:
         ansible_fqdn != ansible_ssh_host 
 
-    - name: Register with RHN Account
-      redhat_subscription:
-        state: present
-        username: "{{ rhnusername }}"
-        password: "{{ rhnpassword }}"
-        auto_attach: true
-       
+      
