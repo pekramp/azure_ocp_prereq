@@ -1,0 +1,119 @@
+---
+#### Make sure to run as 'ansible-playbook -u root -k' for first run
+- name: Setup machine to connect to azure and install ocp 4.x
+  hosts: localhost
+  vars_files:
+    - ./vars/main.yml
+  tasks:
+    - name: Add repository
+      yum_repository:
+        name: epel
+        description: EPEL YUM repo
+        baseurl: https://download.fedoraproject.org/pub/epel/$releasever/Everything/$basearch/
+      become: true
+
+    - name: Add the Microsoft Repository key
+      rpm_key:
+        state: present
+        key: https://packages.microsoft.com/keys/microsoft.asc
+      become: true
+
+    - name: Create the repo info
+      copy: 
+        src: ./files/azure-cli.repo
+        dest: /etc/yum.repos.d/azure-cli.repo  
+      become: true
+
+
+    - name: Yum clean metadata
+      command: yum clean metadata
+      args:
+        warn: no
+      become: true
+
+    - name: Ensure updates are applied
+      package:
+        name: "*"
+        state: latest
+      become: true
+
+    - name: Install pacakages
+      package:
+        name: "{{ prereq_packages }}"
+        state: latest
+      become: true
+
+    - name: Enable service snapd and ensure it is not masked
+      systemd:
+        name: snapd.socket
+        state: started
+        enabled: yes
+        masked: no
+
+    - name: Create a sym link for snapd
+      file:
+        src: /var/lib/snapd/snap
+        dest: /snap
+        state: link
+
+    - name: Run snap install yq
+      command: snap install yq creates=/var/lib/snapd/snap/bin/yq
+
+    - name: Check for oc
+      stat:
+        path: /usr/local/sbin/oc
+      register: oc_result
+
+    - name: Download and Extract oc/kubectl
+      unarchive:
+        src: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ ocp_release }}/openshift-client-linux-{{ ocp_release }}.tar.gz
+        dest: /usr/local/sbin/
+        remote_src: yes
+      when: not oc_result.stat.exists
+
+    - name: Remove README.md from path
+      file: 
+        path: /usr/local/sbin/README.md
+        state: absent
+      when: not oc_result.stat.exists
+ 
+    - name: Create a sym link for oc
+      file:
+        src: /usr/local/sbin/oc
+        dest: /usr/sbin/oc
+        state: link
+      become: true
+
+    - name: Create a sym link for kubectl
+      file:
+        src: /usr/local/sbin/kubectl
+        dest: /usr/sbin/kubectl
+        state: link
+      become: true
+
+    - name: Check for openshift-install
+      stat:
+        path: /usr/local/sbin/openshift-install
+      register: stat_result
+
+    - name: Extract the openshift installer
+      command: 'oc adm release extract -a ./vars/pullsecret.json --command=openshift-install "quay.io/openshift-release-dev/ocp-release:{{ ocp_release }}-x86_64"'
+      when: not stat_result.stat.exists
+
+    - name: Move the openshift installer to the correct location
+      command: mv openshift-install /usr/local/sbin/
+      when: not stat_result.stat.exists
+
+    - name: Create a sym link for openshift-install
+      file:
+        src: /usr/local/sbin/openshift-install
+        dest: /usr/sbin/openshift-install
+        state: link
+      when: not stat_result.stat.exists
+      become: true
+
+    - name: Generate SSH key if one doesn't exist
+      command: ssh-keygen -t rsa -b 4096 -N '' -f ~/.ssh/id_rsa creates=~/.ssh/id_rsa
+
+    - name: Set Azure region to government
+      command:  az cloud set --name AzureUSGovernment

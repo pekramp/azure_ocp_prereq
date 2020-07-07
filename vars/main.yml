@@ -1,0 +1,11 @@
+---
+# vars file for azure ocp
+#ansible_python_interpreter: /usr/bin/python3
+ocp_release: 4.4.11
+
+prereq_packages:
+  - jq
+  - snapd
+  - azure-cli
+  - vim
+  - git

@@ -1,15 +1,1 @@
-pihole
-
-[lab]
-rhel8.lab
-rhel8target.lab
-tower.lab
-
-[kubecluster]
-kube[01:06].lab
-
-[x86nodes]
-kube[05:06].lab
-
-[armnodes]
-kube[01:04].lab
+localhost

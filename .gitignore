@@ -1,3 +1,4 @@
 awskeys.yml
 *.swp
 *.retry
+*.json
