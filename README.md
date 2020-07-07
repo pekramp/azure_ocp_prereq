@@ -4,7 +4,7 @@ Prepare a machine for installing OpenShift in azure government
 Clone this project `git clone git@github.com:pekramp/azure_ocp_prereq.git`<br />
 Change into the directory `cd azure_ocp_prereq`
 
-Vars (vars/main.yml)
+**Vars (vars/main.yml)**
 ocp_release = the version of OCP you want to get ready to install <br />
 prereq_packages = the packages that will be installed to prepare to run the installer
 
