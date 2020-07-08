@@ -117,3 +117,21 @@
 
     - name: Set Azure region to government
       command:  az cloud set --name AzureUSGovernment
+
+    - name: Create folder for ARM templates ~/azure-resources/
+      file:
+        path: ~/azure-resources
+        state: directory
+        mode: '0755'
+
+    - name: Stage ARM templates in the new directotry
+      copy:
+        src: ./files/{{ item }}
+        dest: ~/azure-resources/
+      with_items:
+        - 01_vnet.json
+        - 02_storage.json
+        - 03_infra.json
+        - 04_bootstrap.json
+        - 05_masters.json
+        - 06_workers.json 
