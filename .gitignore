@@ -1,4 +1,4 @@
 awskeys.yml
 *.swp
 *.retry
-*.json
+pullsecret.json
